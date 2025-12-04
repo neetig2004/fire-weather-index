@@ -5,23 +5,20 @@ import pandas as pd
 
 app = FastAPI(title="FWI Prediction API")
 
-# Allow Streamlit to connect
+# Allow all origins (so Streamlit can call the API)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],      # allow all origins
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Load trained model + preprocessors
-model_data = joblib.load("model.pkl")
+# Load trained model (your model.pkl is ONLY the model object)
+model = joblib.load("model.pkl")
 
-model = model_data["model"]
-scaler = model_data["scaler"]
-imputer = model_data["imputer"]
-poly = model_data["poly"]
-features = model_data["features"]   # list of feature names
+# IMPORTANT: feature names must match training EXACTLY (with spaces)
+features = ['Temperature', ' RH', ' Ws', 'Rain ', 'FFMC', 'DMC', 'DC', 'ISI', 'BUI']
 
 
 @app.get("/")
@@ -31,19 +28,26 @@ def home():
 
 @app.post("/api/predict")
 def predict(data: dict):
-    """Predict Fire Weather Index (FWI) from input features"""
+    """
+    Expect JSON like:
+    {
+        "Temperature": 25,
+        " RH": 40,
+        " Ws": 10,
+        "Rain ": 0,
+        "FFMC": 85,
+        "DMC": 50,
+        "DC": 100,
+        "ISI": 7,
+        "BUI": 60
+    }
+    """
     try:
-        # Convert input dict to dataframe
+        # Arrange input values in the correct order
         input_values = [[data[f] for f in features]]
         df_input = pd.DataFrame(input_values, columns=features)
 
-        # Preprocess
-        df_imputed = imputer.transform(df_input)
-        df_poly = poly.transform(df_imputed)
-        df_scaled = scaler.transform(df_poly)
-
-        # Predict
-        pred = round(model.predict(df_scaled)[0], 3)
+        pred = round(float(model.predict(df_input)[0]), 3)
 
         return {"predicted_FWI": pred}
 

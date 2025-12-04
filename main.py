@@ -1,49 +1,54 @@
-# ============================================
-# FastAPI Backend - Fire Weather Index (FWI) Prediction
-# ============================================
+import streamlit as st
+import requests
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-import joblib
-import pandas as pd
+# FastAPI backend URL
+API_URL = "http://127.0.0.1:8000/api/predict"
 
-app = FastAPI(title="FWI Prediction API")
+st.set_page_config(page_title="FWI Prediction", page_icon="🔥", layout="centered")
 
-# Allow Streamlit to connect
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # allow all origins (you can restrict to localhost:8501)
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+st.title("🔥 Fire Weather Index (FWI) Prediction")
+st.markdown("Enter the meteorological parameters below to get the predicted FWI value.")
 
-# Load trained model
-model_data = joblib.load("PolynomialRegression_FWI_model.joblib")
-model = model_data["model"]
-scaler = model_data["scaler"]
-imputer = model_data["imputer"]
-poly = model_data["poly"]
-features = model_data["features"]
+# Input columns
+col1, col2 = st.columns(2)
 
-@app.get("/")
-def home():
-    return {"message": "Welcome to the Fire Weather Index Prediction API!"}
+with col1:
+    day = st.number_input("Day", min_value=1, max_value=31, value=15)
+    month = st.number_input("Month", min_value=1, max_value=12, value=7)
+    year = st.number_input("Year", min_value=1900, max_value=2100, value=2012)
+    Temperature = st.number_input("Temperature (°C)", value=30.0)
+    RH = st.number_input("Relative Humidity (%)", value=40.0)
+    WS = st.number_input("Wind Speed (km/h)", value=6.0)
 
-@app.post("/api/predict")
-def predict(data: dict):
-    """Predict Fire Weather Index (FWI) from input features"""
+with col2:
+    Rain = st.number_input("Rain (mm)", value=0.0)
+    FFMC = st.number_input("FFMC", value=85.0)
+    DMC = st.number_input("DMC", value=25.0)
+    DC = st.number_input("DC", value=60.0)
+    ISI = st.number_input("ISI", value=5.0)
+    BUI = st.number_input("BUI", value=30.0)
+
+# Predict button
+if st.button("🔥 Predict FWI"):
+    data = {
+        "Day": day,
+        "Month": month,
+        "Year": year,
+        "Temperature": Temperature,
+        "RH": RH,
+        "WS": WS,
+        "Rain": Rain,
+        "FFMC": FFMC,
+        "DMC": DMC,
+        "DC": DC,
+        "ISI": ISI,
+        "BUI": BUI
+    }
+
+    response = requests.post(API_URL, json=data)
+
     try:
-        input_values = [data[f] for f in features]
-        df_input = pd.DataFrame([input_values], columns=features)
-
-        # Preprocess
-        df_imputed = imputer.transform(df_input)
-        df_poly = poly.transform(df_imputed)
-        df_scaled = scaler.transform(df_poly)
-
-        pred = round(model.predict(df_scaled)[0], 3)
-        return {"predicted_FWI": pred}
-
-    except Exception as e:
-        return {"error": str(e)}
+        result = response.json()
+        st.success(f"Predicted FWI: **{result['predicted_FWI']}**")
+    except:
+        st.error("Error occurred. Check backend connection.")
